@@ -85,6 +85,14 @@ public class MainActivity extends AppCompatActivity {
     private boolean isFlashSupported;
     private boolean isTorchOn = false;
 
+    /* {
+          "deviceName": "1bf99df2",
+          "platformName": "android",
+          "appPackage": "com.deepak.camera2api",
+          "appActivity": "com.deepak.camera2api.MainActivity",
+          "noReset": true
+        } */
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
