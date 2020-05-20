@@ -9,13 +9,15 @@ import org.robolectric.RobolectricTestRunner;
 import static org.junit.Assert.assertNotNull;
 
 @RunWith(RobolectricTestRunner.class)
+//@Config(shadows={ShadowFoo.class, ShadowBar.class})
 //@Config(constants = BuildConfig.class)
-public class MainActivityTest {
-    private MainActivity activity;
+public class Camera2ActivityTest {
+    private Camera2Activity activity;
 
     @Before
     public void setUp() throws Exception {
-        activity = Robolectric.buildActivity(MainActivity .class)
+        Camera2Activity activity = Robolectric.setupActivity(Camera2Activity.class);
+        activity = Robolectric.buildActivity(Camera2Activity.class)
                 .create()
                 .resume()
                 .get();
@@ -24,6 +26,7 @@ public class MainActivityTest {
     @Test
     public void shouldNotBeNull() throws Exception {
         assertNotNull(activity);
+        //ShadowPackageManager packageManager = shadowOf(RuntimeEnvironment.application.getPackageManager());
     }
 
 }

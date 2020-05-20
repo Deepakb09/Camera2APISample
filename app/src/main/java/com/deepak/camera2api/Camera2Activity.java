@@ -4,6 +4,7 @@ import android.Manifest;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.ImageFormat;
 import android.graphics.SurfaceTexture;
@@ -49,7 +50,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-public class MainActivity extends AppCompatActivity {
+public class Camera2Activity extends AppCompatActivity implements ImageReader.OnImageAvailableListener {
 
     private static final String TAG = "AndroidCameraApi";
     private Button takePictureButton, buttonCameraFacing, btnSettings;
@@ -71,7 +72,7 @@ public class MainActivity extends AppCompatActivity {
     protected CaptureRequest.Builder captureRequestBuilder;
     SurfaceTexture texture;
     Surface surface;
-    private Size imageDimension;
+    private Size imageDimension = null;
     private ArrayList<Size> imageDimentionArrayList = new ArrayList<>();
     private ImageReader imageReader;
     private File file;
@@ -96,15 +97,37 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
+        setContentView(R.layout.activity_camera2);
 
         textureView = findViewById(R.id.texture);
         assert textureView != null;
+
         textureView.setSurfaceTextureListener(textureListener);
         takePictureButton = findViewById(R.id.btn_takepicture);
         buttonCameraFacing = findViewById(R.id.buttonCameraFacing);
         btnFlash = findViewById(R.id.btnFlash);
         btnSettings = findViewById(R.id.btnSettings);
+
+        Intent intent = getIntent();
+        imageDimension = Size.parseSize(intent.getExtras().getString("resolution"));
+        cameraId = intent.getExtras().getString("cameraId");
+        if (cameraId.equals("0")) {
+            cameraFacing = Camera.CameraInfo.CAMERA_FACING_BACK;
+            buttonCameraFacing.setText("Front");
+        } else {
+            cameraFacing = Camera.CameraInfo.CAMERA_FACING_FRONT;
+            buttonCameraFacing.setText("Back");
+        }
+        isFlashSupported = intent.getExtras().getBoolean("isFlashAvailable");
+        if (!isFlashSupported) {
+            btnFlash.setBackground(getDrawable(R.drawable.ic_flash_off_black_48dp));
+            btnFlash.setClickable(false);
+        } else {
+            //btnFlash.setBackground(getDrawable(R.drawable.ic_flash_on_black_48dp));
+            btnFlash.setClickable(true);
+        }
+        Log.e(TAG, "image resolution : " + imageDimension);
+
         assert takePictureButton != null;
         manager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
         takePictureButton.setOnClickListener(new View.OnClickListener() {
@@ -194,7 +217,7 @@ public class MainActivity extends AppCompatActivity {
                     for (int i = 0; i < imageDimentionArrayList.size(); i++) {
                         dimensionString[i] = String.valueOf(imageDimentionArrayList.get(i));
                     }
-                    AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
+                    AlertDialog.Builder builder = new AlertDialog.Builder(Camera2Activity.this);
                     builder.setTitle("Make your selection");
                     builder.setItems(dimensionString, new DialogInterface.OnClickListener() {
                         public void onClick(DialogInterface dialog, int item) {
@@ -220,7 +243,7 @@ public class MainActivity extends AppCompatActivity {
 
                                     @Override
                                     public void onConfigureFailed(@NonNull CameraCaptureSession cameraCaptureSession) {
-                                        Toast.makeText(MainActivity.this, "Configuration change", Toast.LENGTH_SHORT).show();
+                                        Toast.makeText(Camera2Activity.this, "Configuration change", Toast.LENGTH_SHORT).show();
                                     }
                                 }, null);
                             } catch (CameraAccessException e) {
@@ -274,6 +297,7 @@ public class MainActivity extends AppCompatActivity {
 
         @Override
         public void onError(CameraDevice camera, int error) {
+            if (camera != null && cameraDevice != null)
             cameraDevice.close();
             cameraDevice = null;
         }
@@ -283,7 +307,7 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void onCaptureCompleted(CameraCaptureSession session, CaptureRequest request, TotalCaptureResult result) {
             super.onCaptureCompleted(session, request, result);
-            Toast.makeText(MainActivity.this, "Saved:" + file, Toast.LENGTH_SHORT).show();
+            Toast.makeText(Camera2Activity.this, "Saved:" + file, Toast.LENGTH_SHORT).show();
             createCameraPreview();
         }
     };
@@ -334,8 +358,8 @@ public class MainActivity extends AppCompatActivity {
             // Orientation
             int rotation = getWindowManager().getDefaultDisplay().getRotation();
             captureBuilder.set(CaptureRequest.JPEG_ORIENTATION, ORIENTATIONS.get(rotation));
-            final File file = new File(Environment.getExternalStorageDirectory() + "/pic.jpg");
-            ImageReader.OnImageAvailableListener readerListener = new ImageReader.OnImageAvailableListener() {
+            //final File file = new File(Environment.getExternalStorageDirectory() + "/pic.jpg");
+            /*ImageReader.OnImageAvailableListener readerListener = new ImageReader.OnImageAvailableListener() {
                 @Override
                 public void onImageAvailable(ImageReader reader) {
                     Image image = null;
@@ -367,13 +391,13 @@ public class MainActivity extends AppCompatActivity {
                         }
                     }
                 }
-            };
-            reader.setOnImageAvailableListener(readerListener, mBackgroundHandler);
+            };*/
+            reader.setOnImageAvailableListener(this, mBackgroundHandler);
             final CameraCaptureSession.CaptureCallback captureListener = new CameraCaptureSession.CaptureCallback() {
                 @Override
                 public void onCaptureCompleted(CameraCaptureSession session, CaptureRequest request, TotalCaptureResult result) {
                     super.onCaptureCompleted(session, request, result);
-                    Toast.makeText(MainActivity.this, "Saved:" + file, Toast.LENGTH_SHORT).show();
+                    Toast.makeText(Camera2Activity.this, "Saved:" + file, Toast.LENGTH_SHORT).show();
                     createCameraPreview();
                 }
             };
@@ -412,6 +436,7 @@ public class MainActivity extends AppCompatActivity {
         try {
             texture = textureView.getSurfaceTexture();
             assert texture != null;
+            Log.e(TAG, "image resolution : " + imageDimension);
             texture.setDefaultBufferSize(imageDimension.getWidth(), imageDimension.getHeight());
             surface = new Surface(texture);
             captureRequestBuilder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
@@ -430,7 +455,7 @@ public class MainActivity extends AppCompatActivity {
 
                 @Override
                 public void onConfigureFailed(@NonNull CameraCaptureSession cameraCaptureSession) {
-                    Toast.makeText(MainActivity.this, "Configuration change", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(Camera2Activity.this, "Configuration change", Toast.LENGTH_SHORT).show();
                 }
             }, null);
         } catch (CameraAccessException e) {
@@ -444,16 +469,6 @@ public class MainActivity extends AppCompatActivity {
         Log.e(TAG, "is camera open");
         try {
             cameraId = manager.getCameraIdList()[0];
-            /*for (String cameraId : manager.getCameraIdList()) {
-                CameraCharacteristics cameraCharacteristics = manager.getCameraCharacteristics(cameraId);
-                Log.e(TAG, "setUpCamera: " + cameraCharacteristics.get(CameraCharacteristics.LENS_FACING).toString());
-                if (cameraCharacteristics.get(CameraCharacteristics.LENS_FACING) == cameraFacing) {
-                    StreamConfigurationMap streamConfigurationMap = cameraCharacteristics.get(
-                            CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
-                    //previewSize = streamConfigurationMap.getOutputSizes(SurfaceTexture.class)[0];
-                    this.cameraId = cameraId;
-                }
-            }*/
             CameraCharacteristics characteristics = manager.getCameraCharacteristics(cameraId);
             StreamConfigurationMap map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
             assert map != null;
@@ -470,10 +485,12 @@ public class MainActivity extends AppCompatActivity {
                 imageDimentionArrayList.add(map.getOutputSizes(SurfaceTexture.class)[i]);
                 Log.e(TAG, "openCamera: " + imageDimentionArrayList.get(i));
             }
-            imageDimension = map.getOutputSizes(SurfaceTexture.class)[0];
+            if (imageDimension == null)
+                imageDimension = map.getOutputSizes(SurfaceTexture.class)[0];
+
             // Add permission for camera and let user grant the permission
             if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-                ActivityCompat.requestPermissions(MainActivity.this, new String[]{Manifest.permission.CAMERA, Manifest.permission.WRITE_EXTERNAL_STORAGE}, REQUEST_CAMERA_PERMISSION);
+                ActivityCompat.requestPermissions(Camera2Activity.this, new String[]{Manifest.permission.CAMERA, Manifest.permission.WRITE_EXTERNAL_STORAGE}, REQUEST_CAMERA_PERMISSION);
                 return;
             }
             manager.openCamera(cameraId, stateCallback, null);
@@ -529,7 +546,7 @@ public class MainActivity extends AppCompatActivity {
         if (requestCode == REQUEST_CAMERA_PERMISSION) {
             if (grantResults[0] == PackageManager.PERMISSION_DENIED) {
                 // close the app
-                Toast.makeText(MainActivity.this, "Sorry!!!, you can't use this app without granting permission", Toast.LENGTH_LONG).show();
+                Toast.makeText(Camera2Activity.this, "Sorry!!!, you can't use this app without granting permission", Toast.LENGTH_LONG).show();
                 finish();
             }
         }
@@ -551,7 +568,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         Log.e(TAG, "onPause");
-        //closeCamera();
+        closeCamera();
         stopBackgroundThread();
         super.onPause();
     }
@@ -559,5 +576,39 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onStop() {
         super.onStop();
+    }
+
+    @Override
+    public void onImageAvailable(ImageReader reader) {
+        Image image = null;
+        try {
+            image = reader.acquireLatestImage();
+            ByteBuffer buffer = image.getPlanes()[0].getBuffer();
+            byte[] bytes = new byte[buffer.capacity()];
+            buffer.get(bytes);
+            save(bytes);
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            if (image != null) {
+                image.close();
+            }
+        }
+    }
+
+    private void save(byte[] bytes) throws IOException {
+        final File file = new File(Environment.getExternalStorageDirectory() + "/pic.jpg");
+        OutputStream output = null;
+        try {
+            output = new FileOutputStream(file);
+            output.write(bytes);
+            Log.e(TAG, "Image captured and saved");
+        } finally {
+            if (null != output) {
+                output.close();
+            }
+        }
     }
 }
